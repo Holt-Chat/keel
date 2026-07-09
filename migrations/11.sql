@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN bot_private INTEGER DEFAULT 1;

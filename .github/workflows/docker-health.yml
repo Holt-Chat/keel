@@ -1,0 +1,90 @@
+name: Docker Health Check
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["*"]
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout frontend (Shore)
+        uses: actions/checkout@v4
+        with:
+          repository: holt-chat/Shore
+          path: Shore
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Create config.toml with blank URI prefix
+        run: |
+          sed 's/uri_prefix="\$URI_PREFIX"/uri_prefix=""/' default_config.toml > config.toml
+          sed -i 's|frontend_directory="../Shore"|frontend_directory="./Shore"|' config.toml
+
+      - name: Create data directory
+        run: mkdir -p data
+
+      - name: Generate SSL certificates
+        run: |
+          pip install cryptography
+          python self_ssl.py
+
+      - name: Update docker-compose for CI
+        run: |
+          sed -i '/\.\.\/Shore:\/Shore/d' docker-compose.yml
+
+      - name: Build and start Docker Compose
+        run: docker compose up -d --build
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for keel container to be healthy..."
+          timeout 120 bash -c 'until docker inspect --format="{{.State.Health.Status}}" holt-keel 2>/dev/null | grep -q "healthy"; do sleep 2; done'
+          echo "Container is healthy!"
+
+      - name: Test health endpoint
+        run: |
+          response=$(curl -sfk https://localhost:42835/health)
+          echo "Health response: $response"
+          echo "$response" | jq -e '.status == "ok"' || (echo "Health check failed" && exit 1)
+
+      - name: Test API index endpoint
+        run: |
+          response=$(curl -sfk https://localhost:42835/api/v1/)
+          echo "API response: $response"
+          echo "$response" | jq -e '.running == "Holt"' || (echo "API index check failed" && exit 1)
+          echo "$response" | jq -e 'has("version")' || (echo "API missing version" && exit 1)
+
+      - name: Test username check endpoint
+        run: |
+          response=$(curl -sfk "https://localhost:42835/api/v1/username_check?username=testuser123")
+          echo "Username check response: $response"
+          echo "$response" | jq -e '.success == true' || (echo "Username check failed" && exit 1)
+
+      - name: Test CORS headers
+        run: |
+          response=$(curl -sfk -I -X OPTIONS https://localhost:42835/api/v1/ -H "Origin: http://example.com")
+          echo "CORS response headers:"
+          echo "$response"
+
+      - name: Test 404 handling
+        run: |
+          status=$(curl -sk -o /dev/null -w "%{http_code}" https://localhost:42835/api/v1/nonexistent)
+          echo "404 test status: $status"
+          [ "$status" = "404" ] || (echo "Expected 404, got $status" && exit 1)
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop Docker Compose
+        if: always()
+        run: docker compose down

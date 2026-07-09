@@ -1,0 +1,12 @@
+__pycache__/
+.venv/
+data/
+certs/
+.gitignore
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md
+.git
+config.toml
+LICENSE
