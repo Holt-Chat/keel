@@ -36,7 +36,7 @@ def me(db:SQLite, id, session_token):
         with challenges_lock: challenges[challenge_id]={"id": id, "hashed": challenge_hash, "expire": timestamp()+60, "logged_in_at": logged_in_at}
         return jsonify({"id": challenge_id, "challenge": challenge_enc, "success": False}), 419
 
-    user_data=db.select_data("users", ["id", "username", "pfp", "display_name AS display", "status AS presence", "share_last_seen", "share_typing"], {"id": id})[0]
+    user_data=db.select_data("users", ["id", "username", "pfp", "display_name AS display", "status AS presence", "status_auto", "share_last_seen", "share_typing"], {"id": id})[0]
     return jsonify({**user_data, "success": True})
 
 @users_bp.route("/me/logout", methods=["DELETE"])
@@ -94,6 +94,7 @@ def edit_status(db:SQLite, id):
     if "status" in request.form:
         if request.form["status"] not in ("online", "idle", "dnd", "invisible"): return make_json_error(400, "Invalid status parameter")
         update_data["status"]=request.form["status"]
+        update_data["status_auto"]=1 if request.form.get("auto")=="1" else 0
     if "share_last_seen" in request.form:
         if request.form["share_last_seen"] not in ("0", "1"): return make_json_error(400, "Invalid share_last_seen parameter")
         update_data["share_last_seen"]=int(request.form["share_last_seen"])
