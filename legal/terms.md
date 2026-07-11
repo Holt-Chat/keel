@@ -1,6 +1,6 @@
 # Terms of Service
 
-_Last updated: 2026/06/22_
+_Last updated: 2026/07/11_
 
 Welcome to this Holt instance. Holt is open source, end-to-end-encrypted chat software. By creating an account or using this instance you agree to these Terms. If you do not agree, do not use the service.
 
@@ -21,6 +21,7 @@ You agree not to:
 - Distribute malware, spam, or content you have no right to share.
 - Attempt to disrupt, overload, or gain unauthorized access to the instance or other users' accounts.
 - Abuse the encryption to coordinate activity that is illegal where the operator is located.
+- Automate, script, or otherwise programmatically control a normal user account (a "self-bot"). If you want a bot, create a dedicated bot account through the official bot API.
 
 The operator may suspend or remove accounts that break these Terms or the community Rules.
 
