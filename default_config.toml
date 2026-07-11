@@ -51,6 +51,10 @@ uri_prefix="$URI_PREFIX" # URI Prefix, you must include it when connecting to th
     last_seen=true # Allow showing last-seen timestamps for offline users (users can opt out individually)
 [typing]
     enabled=true # Enable or disable typing indicators in DMs and group channels
+[reactions]
+    enabled=true # Enable or disable message reactions
+    max_per_message=20 # Maximum number of reaction rows a single user can add to a single message (abuse guard, not a uniqueness guarantee)
+    max_unique_per_message=20 # Maximum distinct emoji on a single message in broadcast channels; maximum total reaction rows on a single message in encrypted channels (true uniqueness can't be checked server-side there)
 [push]
     enabled=true # Enable or disable Web Push background notifications (opt-in per user; needs HTTPS or localhost)
     vapid_subject="mailto:admin@example.com" # Contact for the push service (mailto: or https: URL), required by the Web Push spec

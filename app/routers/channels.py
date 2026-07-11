@@ -156,7 +156,7 @@ def channel_creation(db:SQLite, id):
         pfp_result=handle_pfp()
         if isinstance(pfp_result, tuple): return pfp_result
         try:
-            db.insert_data("channels", {"id": channel_id, "name": None, "pfp": pfp_result, "type": 1, "permissions": perm.send_messages, "dm": dm_id, "created_at": timestamp()})
+            db.insert_data("channels", {"id": channel_id, "name": None, "pfp": pfp_result, "type": 1, "permissions": perm.send_messages|perm.add_reactions, "dm": dm_id, "created_at": timestamp()})
             with db:
                 message_seq=get_channel_last_message_seq(db, channel_id)
                 interaction_seq=get_channel_last_interaction_seq(db, channel_id)
@@ -225,7 +225,7 @@ def channel_creation(db:SQLite, id):
         channel_id=generate()
         pfp_result=handle_pfp()
         if isinstance(pfp_result, tuple): return pfp_result
-        db.insert_data("channels", {"id": channel_id, "name": request.form["name"], "pfp": pfp_result, "type": channel_type, "permissions": perm.send_messages if channel_type==2 else 0, "created_at": timestamp()})
+        db.insert_data("channels", {"id": channel_id, "name": request.form["name"], "pfp": pfp_result, "type": channel_type, "permissions": (perm.send_messages|perm.add_reactions) if channel_type==2 else perm.add_reactions, "created_at": timestamp()})
         db.insert_data("members", {"user_id": id, "channel_id": channel_id, "joined_at": timestamp(), "permissions": perm.owner, "message_seq": 0 if channel_type==3 else get_channel_last_message_seq(db, channel_id), "interaction_seq": 0 if channel_type==3 else get_channel_last_interaction_seq(db, channel_id)})
 
         # Emit channel added event

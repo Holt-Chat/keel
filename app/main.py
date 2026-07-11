@@ -24,6 +24,7 @@ from app.routers.bans import bans_bp
 from app.routers.messages import messages_bp
 from app.routers.users import users_bp
 from app.routers.pins import pins_bp
+from app.routers.reactions import reactions_bp
 from app.routers.stream import stream_bp, start_call_sweep, start_message_expiry_sweep
 from app.routers.calls import calls_bp
 from app.routers.webhooks import webhooks_bp
@@ -69,6 +70,7 @@ with SQLite() as db:
     db.create_table("interaction_history", {"seq": "INTEGER PRIMARY KEY AUTOINCREMENT", "id": "TEXT UNIQUE NOT NULL", "channel_id": "TEXT NOT NULL", "user_username": "TEXT NOT NULL", "user_display": "TEXT", "command": "TEXT NOT NULL", "bot_username": "TEXT NOT NULL", "timestamp": "INTEGER NOT NULL", "FOREIGN KEY (channel_id)": "REFERENCES channels (id) ON DELETE CASCADE"})
     db.create_table("component_interactions", {"id": "TEXT PRIMARY KEY", "channel_id": "TEXT NOT NULL", "message_id": "TEXT NOT NULL", "user_id": "TEXT NOT NULL", "bot_id": "TEXT NOT NULL", "custom_id": "TEXT NOT NULL", "timestamp": "INTEGER NOT NULL", "responded": "INTEGER NOT NULL DEFAULT 0", "FOREIGN KEY (channel_id)": "REFERENCES channels (id) ON DELETE CASCADE", "FOREIGN KEY (message_id)": "REFERENCES messages (id) ON DELETE CASCADE"})
     db.create_table("embed_assets", {"id": "TEXT PRIMARY KEY", "file_id": "TEXT NOT NULL", "channel_id": "TEXT NOT NULL", "uploader_id": "TEXT NOT NULL", "message_id": "TEXT", "key_id": "TEXT", "iv": "TEXT", "encrypted": "INTEGER NOT NULL DEFAULT 0", "created_at": "INTEGER NOT NULL", "FOREIGN KEY (file_id)": "REFERENCES files (id) ON DELETE CASCADE", "FOREIGN KEY (channel_id)": "REFERENCES channels (id) ON DELETE CASCADE", "FOREIGN KEY (uploader_id)": "REFERENCES users (id) ON DELETE CASCADE", "FOREIGN KEY (message_id)": "REFERENCES messages (id) ON DELETE SET NULL"})
+    db.create_table("message_reactions", {"seq": "INTEGER PRIMARY KEY AUTOINCREMENT", "id": "TEXT UNIQUE NOT NULL", "message_id": "TEXT NOT NULL", "channel_id": "TEXT NOT NULL", "user_id": "TEXT NOT NULL", "content": "TEXT NOT NULL", "key": "TEXT", "iv": "TEXT", "signature": "TEXT", "signed_timestamp": "INTEGER", "created_at": "INTEGER NOT NULL", "FOREIGN KEY (message_id)": "REFERENCES messages (id) ON DELETE CASCADE", "FOREIGN KEY (channel_id)": "REFERENCES channels (id) ON DELETE CASCADE", "FOREIGN KEY (user_id)": "REFERENCES users (id) ON DELETE CASCADE"})
     db.create_table("oauth_apps", {"id": "TEXT PRIMARY KEY", "owner_id": "TEXT NOT NULL", "name": "TEXT NOT NULL", "pfp": "TEXT", "client_secret_hash": "TEXT NOT NULL", "redirect_uris": "TEXT NOT NULL", "created_at": "INTEGER NOT NULL", "FOREIGN KEY (owner_id)": "REFERENCES users (id) ON DELETE CASCADE", "FOREIGN KEY (pfp)": "REFERENCES files (id) ON DELETE SET NULL"})
     db.create_table("oauth_tokens", {"id": "TEXT PRIMARY KEY", "token_hash": "TEXT UNIQUE NOT NULL", "app_id": "TEXT NOT NULL", "user_id": "TEXT NOT NULL", "scope": "TEXT NOT NULL", "created_at": "INTEGER NOT NULL", "expires_at": "INTEGER NOT NULL", "FOREIGN KEY (app_id)": "REFERENCES oauth_apps (id) ON DELETE CASCADE", "FOREIGN KEY (user_id)": "REFERENCES users (id) ON DELETE CASCADE"})
     db.create_table("oauth_consents", {"app_id": "TEXT NOT NULL", "user_id": "TEXT NOT NULL", "scope": "TEXT NOT NULL", "granted_at": "INTEGER NOT NULL", "PRIMARY KEY": "(app_id, user_id)", "FOREIGN KEY (app_id)": "REFERENCES oauth_apps (id) ON DELETE CASCADE", "FOREIGN KEY (user_id)": "REFERENCES users (id) ON DELETE CASCADE"})
@@ -76,6 +78,9 @@ with SQLite() as db:
     db.create_index("embed_assets", "file_id")
     db.create_index("embed_assets", "message_id")
     db.create_index("embed_assets", "created_at")
+    db.create_index("message_reactions", "message_id")
+    db.create_index("message_reactions", "channel_id")
+    db.create_index("message_reactions", ["message_id", "user_id"])
     db.create_index("session", "user")
     db.create_index("members", "channel_id")
     db.create_index("members", "message_seq")
@@ -204,7 +209,7 @@ def register_router(router, prefix):
             _path_groups[path][m]=func
 
 API_PREFIX="/api/v1"
-for r in [auth_bp, channels_bp, keys_bp, members_bp, bans_bp, messages_bp, users_bp, pins_bp, stream_bp, calls_bp, webhooks_bp, legal_bp, push_bp, bots_bp, interactions_bp, oauth_bp]:
+for r in [auth_bp, channels_bp, keys_bp, members_bp, bans_bp, messages_bp, users_bp, pins_bp, reactions_bp, stream_bp, calls_bp, webhooks_bp, legal_bp, push_bp, bots_bp, interactions_bp, oauth_bp]:
     register_router(r, API_PREFIX)
 
 for path in _path_order:

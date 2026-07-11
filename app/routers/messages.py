@@ -64,7 +64,11 @@ def channel_messages(db:SQLite, id, channel_id):
             "   'iv', am.iv",
             ")) FROM attachment_message am ",
             "   JOIN files f ON am.file_id = f.id ",
-            "   WHERE am.message_id = m.id) AS attachments, m.components ",
+            "   WHERE am.message_id = m.id) AS attachments, m.components, ",
+            "(SELECT json_group_array(json_object(",
+            "   'id', mr.id, 'content', mr.content, 'key', mr.key, 'iv', mr.iv, 'created_at', mr.created_at, ",
+            "   'signature', NULL, 'signed_timestamp', NULL, 'user', NULL",
+            ")) FROM message_reactions mr WHERE mr.message_id = m.id) AS reactions ",
             "FROM messages m ",
             "WHERE m.channel_id = ? AND m.seq > ? AND (m.expires_at IS NULL OR m.expires_at > ?)"
         ]
@@ -88,7 +92,12 @@ def channel_messages(db:SQLite, id, channel_id):
             "   'iv', am.iv",
             ")) FROM attachment_message am ",
             "   JOIN files f ON am.file_id = f.id ",
-            "   WHERE am.message_id = m.id) AS attachments, m.components ",
+            "   WHERE am.message_id = m.id) AS attachments, m.components, ",
+            "(SELECT json_group_array(json_object(",
+            "   'id', mr.id, 'content', mr.content, 'key', mr.key, 'iv', mr.iv, 'created_at', mr.created_at, ",
+            "   'signature', mr.signature, 'signed_timestamp', mr.signed_timestamp, ",
+            "   'user', json_object('username', ru.username, 'display', ru.display_name, 'pfp', ru.pfp)",
+            ")) FROM message_reactions mr JOIN users ru ON mr.user_id = ru.id WHERE mr.message_id = m.id) AS reactions ",
             "FROM messages m ",
             "JOIN users u ON m.user_id = u.id ",
             "WHERE m.channel_id = ? AND m.seq > ? AND (m.expires_at IS NULL OR m.expires_at > ?)"
@@ -124,6 +133,7 @@ def channel_messages(db:SQLite, id, channel_id):
         msg["user"]=json.loads(msg["user"]) if msg["user"] else None
         msg["attachments"]=[{**a, "encrypted": bool(a["encrypted"])} for a in json.loads(msg["attachments"])]
         msg["components"]=json.loads(msg["components"]) if msg["components"] else None
+        msg["reactions"]=json.loads(msg["reactions"])
     return jsonify(messages)
 
 @messages_bp.route("/channel/<string:channel_id>/embed-asset", methods=["POST"])
@@ -304,7 +314,8 @@ def sending_messages(db:SQLite, id, channel_id):
         "signed_timestamp": None if hide_signature else signed_timestamp,
         "nonce": nonce,
         "components": json.loads(components_str) if components_str else None,
-        "expires_at": expires_at
+        "expires_at": expires_at,
+        "reactions": []
     }
     if data["type"]==1:
         current_member=db.select_data("members", ["hidden"], {"channel_id": channel_id, "user_id": id})
@@ -382,11 +393,14 @@ def message_management(db:SQLite, id, channel_id, message_id):
             SELECT m.id, m.content, m.key, m.iv, m.timestamp, m.edited_at, m.replied_to, m.signature, m.signed_timestamp, m.nonce, m.webhook_id, m.components,
             json_object('username', CASE WHEN m.user_id='0' THEN NULL ELSE u.username END, 'display', CASE WHEN m.user_id='0' THEN m.webhook_name ELSE u.display_name END, 'pfp', CASE WHEN m.user_id='0' THEN m.webhook_pfp ELSE u.pfp END, 'is_bot', CASE WHEN m.user_id='0' THEN 0 ELSE u.is_bot END) as user,
             (SELECT json_group_array(json_object('id', am.file_id, 'filename', f.filename, 'size', f.size, 'mimetype', f.mimetype, 'encrypted', am.encrypted, 'iv', am.iv))
-             FROM attachment_message am JOIN files f ON am.file_id = f.id WHERE am.message_id = m.id) as attachments
+             FROM attachment_message am JOIN files f ON am.file_id = f.id WHERE am.message_id = m.id) as attachments,
+            (SELECT json_group_array(json_object('id', mr.id, 'content', mr.content, 'key', mr.key, 'iv', mr.iv, 'created_at', mr.created_at, 'signature', mr.signature, 'signed_timestamp', mr.signed_timestamp, 'user', json_object('username', ru.username, 'display', ru.display_name, 'pfp', ru.pfp)))
+             FROM message_reactions mr JOIN users ru ON mr.user_id = ru.id WHERE mr.message_id = m.id) as reactions
             FROM messages m JOIN users u ON m.user_id = u.id WHERE m.id=?
         """, (message_id,))[0]
         updated_message["user"]=json.loads(updated_message["user"])
         updated_message["attachments"]=[{**a, "encrypted": bool(a["encrypted"])} for a in json.loads(updated_message["attachments"])] if updated_message["attachments"] else []
+        updated_message["reactions"]=json.loads(updated_message["reactions"])
         if updated_message["components"]: updated_message["components"]=json.loads(updated_message["components"])
         message_edited(channel_id, updated_message, id, db)
         if embed_asset_ids: db.cleanup_stale_embed_assets()

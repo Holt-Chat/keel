@@ -180,7 +180,8 @@ class perm:
     manage_members=1<<4
     manage_channel=1<<5
     manage_permissions=1<<6
-    mask=(1<<7)-1
+    add_reactions=1<<7
+    mask=(1<<8)-1
 
 def has_permission(user_permissions, required_permission, channel_permissions):
     if user_permissions is None: user_permissions=channel_permissions

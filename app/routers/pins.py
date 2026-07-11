@@ -46,7 +46,11 @@ def get_pinned_messages(db:SQLite, id, channel_id):
             "   'iv', am.iv",
             ")) FROM attachment_message am ",
             "   JOIN files f ON am.file_id = f.id ",
-            "   WHERE am.message_id = m.id) AS attachments ",
+            "   WHERE am.message_id = m.id) AS attachments, ",
+            "(SELECT json_group_array(json_object(",
+            "   'id', mr.id, 'content', mr.content, 'key', mr.key, 'iv', mr.iv, 'created_at', mr.created_at, ",
+            "   'signature', NULL, 'signed_timestamp', NULL, 'user', NULL",
+            ")) FROM message_reactions mr WHERE mr.message_id = m.id) AS reactions ",
             "FROM messages m ",
             "JOIN message_pins mp ON m.id = mp.id ",
             "WHERE m.channel_id = ?"
@@ -68,7 +72,12 @@ def get_pinned_messages(db:SQLite, id, channel_id):
             "   'iv', am.iv",
             ")) FROM attachment_message am ",
             "   JOIN files f ON am.file_id = f.id ",
-            "   WHERE am.message_id = m.id) AS attachments ",
+            "   WHERE am.message_id = m.id) AS attachments, ",
+            "(SELECT json_group_array(json_object(",
+            "   'id', mr.id, 'content', mr.content, 'key', mr.key, 'iv', mr.iv, 'created_at', mr.created_at, ",
+            "   'signature', mr.signature, 'signed_timestamp', mr.signed_timestamp, ",
+            "   'user', json_object('username', ru.username, 'display', ru.display_name, 'pfp', ru.pfp)",
+            ")) FROM message_reactions mr JOIN users ru ON mr.user_id = ru.id WHERE mr.message_id = m.id) AS reactions ",
             "FROM messages m ",
             "JOIN users u ON m.user_id = u.id ",
             "JOIN message_pins mp ON m.id = mp.id ",
@@ -81,11 +90,13 @@ def get_pinned_messages(db:SQLite, id, channel_id):
     for msg in pinned_messages:
         msg["user"]=json.loads(msg["user"]) if msg["user"] else None
         msg["attachments"]=[{**a, "encrypted": bool(a["encrypted"])} for a in json.loads(msg["attachments"])]
+        msg["reactions"]=json.loads(msg["reactions"])
         if msg["key"] and msg["seq"]<=member_message_seq:
             msg["content"]=None
             msg["key"]=None
             msg["iv"]=None
             msg["attachments"]=[]
+            msg["reactions"]=[]
             msg["error"]="pin_before_join"
         del msg["seq"]
     return jsonify(pinned_messages)

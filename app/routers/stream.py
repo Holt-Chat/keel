@@ -214,6 +214,7 @@ def message_edited(channel_id, message_data, user_id, db):
             message_data_no_author["user"]=None
             message_data_no_author["signature"]=None
             message_data_no_author["signed_timestamp"]=None
+            message_data_no_author["reactions"]=[{**r, "user": None, "signature": None, "signed_timestamp": None} for r in (message_data.get("reactions") or [])]
             emit("message_edited", {
                 "channel_id": channel_id,
                 "message": message_data_no_author
@@ -233,6 +234,72 @@ def message_deleted(channel_id, message_id, user_id):
     emit("message_deleted", {
         "channel_id": channel_id,
         "message_id": message_id
+    }, {
+        "channel_ids": [channel_id]
+    })
+
+def reaction_add(channel_id, message_id, reaction_data, db):
+    """Emit reaction added event"""
+    channel_data=db.select_data("channels", ["type", "permissions"], {"id": channel_id})
+    if not channel_data:
+        return
+
+    channel_type=channel_data[0]["type"]
+    channel_permissions=channel_data[0]["permissions"]
+
+    if channel_type==3:
+        member_rows=db.execute_raw_sql("SELECT user_id, permissions FROM members WHERE channel_id=?", (channel_id,))
+
+        manage_users=[]
+        regular_users=[]
+
+        for row in member_rows:
+            member_user_id=row["user_id"]
+            member_permissions=row["permissions"]
+
+            if (has_permission(member_permissions, perm.send_messages, channel_permissions) or
+                has_permission(member_permissions, perm.manage_members, channel_permissions) or
+                has_permission(member_permissions, perm.manage_permissions, channel_permissions)):
+                manage_users.append(member_user_id)
+            else:
+                regular_users.append(member_user_id)
+
+        if manage_users:
+            emit("reaction_add", {
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "reaction": reaction_data
+            }, {
+                "user_id": manage_users
+            })
+
+        if regular_users:
+            reaction_data_no_author=dict(reaction_data)
+            reaction_data_no_author["user"]=None
+            reaction_data_no_author["signature"]=None
+            reaction_data_no_author["signed_timestamp"]=None
+            emit("reaction_add", {
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "reaction": reaction_data_no_author
+            }, {
+                "user_id": regular_users
+            })
+    else:
+        emit("reaction_add", {
+            "channel_id": channel_id,
+            "message_id": message_id,
+            "reaction": reaction_data
+        }, {
+            "channel_ids": [channel_id]
+        })
+
+def reaction_remove(channel_id, message_id, reaction_id, db):
+    """Emit reaction removed event"""
+    emit("reaction_remove", {
+        "channel_id": channel_id,
+        "message_id": message_id,
+        "reaction_id": reaction_id
     }, {
         "channel_ids": [channel_id]
     })
