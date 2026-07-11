@@ -766,8 +766,8 @@ def _stream_cleanup(client, id):
                 user_data=pdb.select_data("users", ["id", "username", "display_name", "pfp"], {"id": id})[0]
                 call_left(row["channel_id"], user_data, pdb)
             if config["presence"]["enabled"]:
-                user_status=pdb.select_data("users", ["status"], {"id": id})
-                if user_status and user_status[0]["status"]!="invisible": pdb.update_data("users", {"last_seen": timestamp(True)}, {"id": id})
+                user_status=pdb.select_data("users", ["status", "share_last_seen"], {"id": id})
+                if user_status and user_status[0]["status"]!="invisible" and user_status[0]["share_last_seen"]: pdb.update_data("users", {"last_seen": timestamp(True)}, {"id": id})
                 presence_broadcast(id, pdb)
         finally: pdb.close()
 

@@ -103,8 +103,9 @@ def edit_status(db:SQLite, id):
         update_data["share_typing"]=int(request.form["share_typing"])
     if not update_data: return make_json_error(400, "No valid parameters to update")
     if update_data.get("status")=="invisible":
-        current_status=db.select_data("users", ["status"], {"id": id})
-        if current_status and current_status[0]["status"]!="invisible": update_data["last_seen"]=timestamp(True)
+        current=db.select_data("users", ["status", "share_last_seen"], {"id": id})
+        effective_share_last_seen=update_data.get("share_last_seen", current[0]["share_last_seen"] if current else 1)
+        if current and current[0]["status"]!="invisible" and effective_share_last_seen: update_data["last_seen"]=timestamp(True)
     db.update_data("users", update_data, {"id": id})
     if "status" in update_data: presence_broadcast(id, db)
     return jsonify({"success": True, **{k:v for k,v in update_data.items() if k!="last_seen"}})
